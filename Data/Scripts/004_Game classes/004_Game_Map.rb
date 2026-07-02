@@ -12,6 +12,7 @@ class Game_Map
   attr_reader   :priorities               # priority table
   attr_reader   :terrain_tags             # terrain tag table
   attr_reader   :events                   # events
+  attr_reader   :active_events            # events that need an update
   attr_accessor :panorama_name            # panorama file name
   attr_accessor :panorama_hue             # panorama hue
   attr_accessor :fog_name                 # fog file name
@@ -61,6 +62,7 @@ class Game_Map
     @need_refresh            = false
     EventHandlers.trigger(:on_game_map_setup, map_id, @map, tileset)
     @events                  = {}
+    @active_events           = []
     @map.events.each_key do |i|
       @events[i]             = Game_Event.new(@map_id, @map.events[i], self)
     end
@@ -436,6 +438,18 @@ class Game_Map
     @need_refresh = false
   end
 
+  def register_event(event)
+    return if event.active
+    @active_events.push(event)
+    event.active = true
+  end
+
+  def unregister_event(event)
+    return if !event.active
+    @active_events.delete(event)
+    event.active = false
+  end
+
   def update
     uptime_now = System.uptime
     play_now = $stats.play_time
@@ -459,7 +473,11 @@ class Game_Map
     end
     # Only update events that are on-screen
     if !$game_temp.in_menu
-      @events.each_value { |event| event.update }
+      @active_events.each { |event| event.update }
+      @events.each_value do |event|
+        next if event.active
+        register_event(event) if event.should_update?(true)
+      end
     end
     # Update common events
     @common_events.each_value { |common_event| common_event.update }

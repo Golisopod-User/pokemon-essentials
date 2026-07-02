@@ -8,6 +8,7 @@ class Game_Event < Game_Character
   attr_reader   :starting
   attr_reader   :tempSwitches   # Temporary self-switches
   attr_accessor :need_refresh
+  attr_accessor :active
 
   def initialize(map_id, event, map = nil)
     super(map)
@@ -26,6 +27,7 @@ class Game_Event < Game_Character
     @route_erased = false
     @through      = true
     @to_update    = true
+    @active       = false
     @tempSwitches = {}
     moveto(@event.x, @event.y) if map
     refresh
@@ -271,6 +273,14 @@ class Game_Event < Game_Character
     @interpreter          = nil
     @interpreter          = Interpreter.new if @trigger == 4   # Parallel Process
     check_event_trigger_auto
+  ensure
+    if self.map
+      if should_update?(true)
+        self.map.register_event(self)
+      else
+        self.map.unregister_event(self)
+      end
+    end
   end
 
   def should_update?(recalc = false)
@@ -290,7 +300,10 @@ class Game_Event < Game_Character
   def update
     @to_update = should_update?(true)
     @updated_last_frame = false
-    return if !@to_update
+    if !@to_update
+      self.map.unregister_event(self) if self.map
+      return
+    end
     @updated_last_frame = true
     @moveto_happened = false
     last_moving = moving?
